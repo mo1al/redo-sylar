@@ -1,0 +1,26 @@
+class:
+    person:
+        name: zhangsan
+        age: 25
+        sex: true
+    map:
+        student1:
+            name: lisi
+            age: 20
+            sex: false
+        student2:
+            name: wangwu
+            age: 22
+            sex: true
+    vec_map:
+        group_a:
+            - name: aaa
+              age: 18
+              sex: false
+            - name: bbb
+              age: 19
+              sex: true
+        group_b:
+            - name: ccc
+              age: 21
+              sex: false

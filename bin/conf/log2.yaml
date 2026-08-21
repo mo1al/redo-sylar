@@ -1,0 +1,5 @@
+logs:
+    - name: root
+      appenders:
+          - type: FileLogAppender
+            file: /home/mo1al/redo-sylar/mutex.txt

@@ -1,0 +1,17 @@
+logs:
+    - name: root
+      level: info
+      formatter: "%d%T%m%n"
+      appenders:
+          - type: FileLogAppender
+            file: /home/mo1al/redo-sylar/root.txt
+          - type: StdoutLogAppender
+    - name: system
+      level: info
+      formatter: "%d%T%m%n"
+      appenders:
+          - type: FileLogAppender
+            file: /home/mo1al/redo-sylar/system.txt
+            formatter: "%d%T[%p]%m%n"
+          - type: StdoutLogAppender
+
