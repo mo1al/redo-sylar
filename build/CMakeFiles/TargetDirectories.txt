@@ -1,4 +1,0 @@
-/home/mo1al/redo-sylar/build/CMakeFiles/server.dir
-/home/mo1al/redo-sylar/build/CMakeFiles/test_main.dir
-/home/mo1al/redo-sylar/build/CMakeFiles/edit_cache.dir
-/home/mo1al/redo-sylar/build/CMakeFiles/rebuild_cache.dir
