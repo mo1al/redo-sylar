@@ -1,0 +1,32 @@
+# ============================================================
+# systemd 服务单元：让博客进程常驻、开机自启、崩溃自动重启
+#
+# 部署方式：
+#   1) 把本文件的 WorkingDirectory / ExecStart 改成你服务器上的实际路径
+#   2) sudo cp deploy/blog.service /etc/systemd/system/blog.service
+#   3) sudo systemctl daemon-reload
+#   4) sudo systemctl enable --now blog        # 启动并设为开机自启
+#   查看状态/日志：
+#   sudo systemctl status blog
+#   sudo journalctl -u blog -f
+# ============================================================
+
+[Unit]
+Description=C++ Knowledge Blog (sylar)
+After=network.target
+
+[Service]
+# 工作目录必须设为项目根目录（程序用相对路径 ./data ./static 读文件）
+WorkingDirectory=/home/YOUR_USER/redo-sylar
+ExecStart=/home/YOUR_USER/redo-sylar/build/server
+Restart=always
+RestartSec=3
+User=YOUR_USER
+# 安全加固：限制进程能力，禁止写 /tmp 之外的文件等
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

@@ -7,6 +7,8 @@ namespace mo1al
 static thread_local Scheduler* t_scheduler = nullptr; // 当前线程所属的调度器
 static thread_local Fiber* t_scheduler_fiber = nullptr; // 当前正在运行的协程
 static thread_local Logger::ptr g_logger = SYLAR_LOG_NAME("system");
+// 这里可以讲一讲 区分use_caller 创建调度器线程也去参与调度任务 
+// 设计角度 mainfiber subfiber rootfiber 
 Scheduler::Scheduler(size_t threads,bool use_caller,const std::string&name)
     : m_name(name)
 {
@@ -18,11 +20,12 @@ Scheduler::Scheduler(size_t threads,bool use_caller,const std::string&name)
         --threads;
         SYLAR_ASSERT(GetThis()==nullptr);
         t_scheduler = this;
+        // 主线程的调度协程
         m_rootFiber.reset(new Fiber(std::bind(&Scheduler::run,this),0,true)); // 调度协程
         t_scheduler_fiber = m_rootFiber.get();
         mo1al::Thread::SetName(m_name);
         m_rootThread = mo1al::getThreadId();
-        m_threadIds.push_back(m_rootThread);
+        // m_threadIds.push_back(m_rootThread);
     }
     else{
         m_rootThread = -1;
@@ -41,7 +44,7 @@ Scheduler* Scheduler::GetThis()
 {
     return t_scheduler;
 }
-Fiber* Scheduler::GetMainFiber()
+Fiber* Scheduler::GetCurrentFiber()
 {
     return t_scheduler_fiber;
 }
@@ -57,14 +60,15 @@ void Scheduler::start()
     SYLAR_ASSERT(m_threads.empty());
     m_threads.resize(m_threadCount);
     for(size_t i=0;i<m_threadCount;i++){
+        // run:idle/exec 
         m_threads[i].reset(new Thread(std::bind(&Scheduler::run,this),m_name+"_"+std::to_string(i)));
-        m_threadIds.push_back(m_threads[i]->getId());
+        // m_threadIds.push_back(m_threads[i]->getId());
     }
 }
 void Scheduler::stop()
 {
     m_autostop = true;
-    // use_caller 且仅主线程参与调度
+    // use_caller 且 仅主线程 参与调度
     if(m_rootFiber&&m_threadCount==0&&
         (m_rootFiber->GetState()==Fiber::INIT||m_rootFiber->GetState()==Fiber::TERM))
     {
@@ -84,8 +88,10 @@ void Scheduler::stop()
         SYLAR_ASSERT(GetThis()!=this);  // 非 use_caller 模式下须由其它线程触发销毁
     }
     m_stopping = true;
+    // threadcount -- use_caller 
     for(size_t i=0;i<m_threadCount;i++)
     {
+        // 唤醒了就去执行任务 
         tickle();
     }
     if(m_rootFiber)
@@ -114,10 +120,10 @@ void Scheduler::SetThis()
 }
 void Scheduler::run()
 {
-    SYLAR_LOG_INFO(g_logger)<<"run";
+    SYLAR_LOG_INFO(g_logger)<<"run  start";
     set_hook_enable(true);
     SetThis();
-    // 非主线程需创建自身的主协程
+    // 非主线程需创建自身的主协程 因为只有主线程自己创建了子协程 
     if(mo1al::getThreadId()!=m_rootThread){
         t_scheduler_fiber = mo1al::Fiber::GetThis().get();
     }
@@ -146,10 +152,9 @@ void Scheduler::run()
                 if(it->fiber&&it->fiber->GetState()==Fiber::EXEC){
                     ++it;
                     continue;
-                }
+                }   
                 ft = *it;
-                m_fibers.erase(it);
-                ++it;
+                it = m_fibers.erase(it); // erase 返回下一元素迭代器，不能再对已失效的 it 执行 ++（use-after-free）
                 m_activeThreadCount++;
                 is_active = true;
                 break;
@@ -166,11 +171,16 @@ void Scheduler::run()
             }
             ft.fiber->swapIn();
             --m_activeThreadCount;
+            // 协程让出(swapOut)时仍为 EXEC，其目标状态记录在 m_nextState。
+            // 这里在 swapIn 返回（上下文已保存）之后统一落定状态，
+            // 使“上下文保存” happens-before“状态变为 HOLD/READY”，
+            // 从而其它线程只有在上下文保存完成后才能看到并再次 swapIn 该协程，
+            // 避免并发 swapcontext 破坏协程栈。
+            if(ft.fiber->GetState()!=Fiber::TERM&&ft.fiber->GetState()!=Fiber::EXCEPT){
+                ft.fiber->SetState(ft.fiber->m_nextState);
+            }
             if(ft.fiber->GetState()==Fiber::READY){
                 schedule(ft.fiber);
-            }
-            else if(ft.fiber->GetState()!=Fiber::TERM&&ft.fiber->GetState()!=Fiber::EXCEPT){
-                ft.fiber->SetState(Fiber::HOLD);
             }
             ft.reset(); // 执行完重置，防止悬空
         }
@@ -184,6 +194,9 @@ void Scheduler::run()
             ft.reset();
             cbfiber->swapIn();
             --m_activeThreadCount;
+            if(cbfiber->GetState()!=Fiber::TERM&&cbfiber->GetState()!=Fiber::EXCEPT){
+                cbfiber->SetState(cbfiber->m_nextState); // 同 ft.fiber 分支：上下文保存后再落定状态
+            }
             if(cbfiber->GetState()==Fiber::READY){
                 schedule(cbfiber);
                 cbfiber.reset();
@@ -192,7 +205,6 @@ void Scheduler::run()
                 cbfiber->reset(nullptr); // 复用栈空间
             }
             else{
-                cbfiber->SetState(Fiber::HOLD);
                 cbfiber.reset();
             }
         }
@@ -202,9 +214,10 @@ void Scheduler::run()
                 --m_activeThreadCount;
                 continue;
             }
+            // 退出调度循环
             if(idlefiber->GetState()==Fiber::TERM||idlefiber->GetState()==Fiber::EXCEPT){
                 SYLAR_LOG_INFO(g_logger)<<"idle term";
-                break; // 退出调度循环
+                break; 
             }
             ++m_idleThreadCount;
             idlefiber->swapIn();
@@ -228,6 +241,7 @@ bool Scheduler::stopping()
 }
 void Scheduler::idle()
 {
+    // Scheduler的idle是配合mainfunc的 
     SYLAR_LOG_INFO(g_logger)<<"idle";
     while(!stopping()) {
         mo1al::Fiber::YieldToHold();

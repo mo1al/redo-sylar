@@ -2,6 +2,7 @@
 #pragma once
 #include<memory>
 #include<functional>
+#include<atomic>
 #include<ucontext.h>
 #include<thread.h>
 
@@ -13,7 +14,7 @@ class Fiber : public std::enable_shared_from_this<Fiber>
 friend class Scheduler; // 允许调度器访问 Fiber 私有成员
 public:
     typedef std::shared_ptr<Fiber>ptr;
-    // 协程状态
+    // 协程状态机 
     enum State
     {
         INIT, // 初始化
@@ -51,13 +52,17 @@ public:
     static void CallerMainFunc();
     uint64_t getId()const{ return m_id;}
     static uint64_t GetFiberId();
-    State GetState()const { return m_state;}
-    void SetState(State state) {m_state = state;}
+    State GetState()const { return m_state.load(std::memory_order_acquire);}
+    void SetState(State state) {m_state.store(state,std::memory_order_release);}
 private:
     uint64_t m_id = 0;
     uint32_t m_stacksize = 0;
     ucontext_t m_ctx;
-    State m_state = INIT;
+    std::atomic<State> m_state{INIT};
+    // 协程让出(swapOut)后希望进入的状态。让出时协程仍为 EXEC，
+    // 由调度器在 swapIn 返回后统一落定，保证“上下文保存”与“状态可见”有序，
+    // 避免其它线程在协程尚未保存完上下文时提前 swapIn（并发 swapcontext 导致栈破坏）。
+    State m_nextState{HOLD};
     void* m_stack = nullptr;
     std::function<void()>m_cb;
 };

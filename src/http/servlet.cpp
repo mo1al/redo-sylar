@@ -1,4 +1,5 @@
 #include"servlet.h"
+#include"service.h"
 #include<fnmatch.h>
 namespace mo1al
 {
@@ -19,6 +20,7 @@ ServletDispatch::ServletDispatch()
     : Servlet("ServletDispatch")
 {
     m_default.reset(new NotFoundServlet("sylar/1.0"));
+    // m_default.reset(new ServiceServlet("sylar/1.0"));
 }
 int32_t ServletDispatch::handle(HttpRequest::ptr request,HttpResponse::ptr response,
         HttpSession::ptr session)
@@ -92,15 +94,18 @@ Servlet::ptr ServletDispatch::getMatchedServlet(const std::string& uri)
 {
     RWMutexType::ReadLock lock(m_mutex);
     auto mit = m_datas.find(uri);
+    // 先精准
     if(mit != m_datas.end()) {
         return mit->second;
     }
+    // 模糊
     for(auto it = m_globs.begin();
             it != m_globs.end(); ++it) {
         if(fnmatch(it->first.c_str(), uri.c_str(), 0) == 0) {
             return it->second;
         }
     }
+    // 默认
     return m_default;
 }
 

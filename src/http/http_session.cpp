@@ -41,7 +41,7 @@ HttpRequest::ptr HttpSession::recvRequest()
     int64_t length = parser->getContentLength();
     if(length>0){
         std::string body;
-        body.reserve(length);
+        body.resize(length); // 必须 resize 而非 reserve：保证 size==length，&body[0]..&body[len] 可写，且 setBody 能拿到完整 body
         int len = 0; // 已拷贝到 body 的字节数
         if(length>offset)
         {
@@ -60,6 +60,10 @@ HttpRequest::ptr HttpSession::recvRequest()
             }
         }
         parser->getData()->setBody(body);
+    }
+    std::string keep_alive = parser->getData()->getHeader("Connection");
+    if(!strcasecmp(keep_alive.c_str(),"keep-alive")){
+        parser->getData()->setClose(false);
     }
     return parser->getData();
 }

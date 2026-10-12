@@ -17,7 +17,7 @@ public:
         WRITE = 0x4, // 可写（EPOLLOUT）
     };
 public:
-    // 文件描述符上下文：记录 fd 的读写事件与等待的协程/回调
+    // 文件描述符上下文：记录fd的读写事件与等待的协程/回调
     struct FdContext
     {
         typedef Mutex MutexType;

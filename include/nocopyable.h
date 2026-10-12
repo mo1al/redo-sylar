@@ -10,6 +10,5 @@ public:
     ~Nocopyable() =default;
     Nocopyable(const Nocopyable&)=delete;
     Nocopyable& operator=(const Nocopyable&)=delete;
-private:
 };
 }

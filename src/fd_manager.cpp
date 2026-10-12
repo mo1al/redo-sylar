@@ -82,11 +82,11 @@ FdCtx::ptr FdManager::get(int fd,bool auto_create)
     }
     lock.unlock();
     MutexType::WriteLock lock2(m_mutex);
+    FdCtx::ptr ctx(new FdCtx(fd));
     // fd 超出当前容量时先扩容，避免越界写
     if((int)m_datas.size() <= fd){
         m_datas.resize(fd * 1.5);
     }
-    FdCtx::ptr ctx(new FdCtx(fd));
     m_datas[fd] = ctx;
     return m_datas[fd];
 }

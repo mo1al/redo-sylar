@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 #include"thread.h"
-#include"sinleton.h"
+#include"singleton.h"
 namespace mo1al
 {
 // 文件描述符上下文：记录 fd 是否为 socket、非阻塞标志与收发超时

@@ -58,6 +58,7 @@ void Config::LoadFromConDir(const std::string&path,bool force)
 {
 
 }
+
 void Config::visit(std::function<void(ConfigVarBase::ptr)>cb)
 {
     mo1al::RWmutex::ReadLock lock(GetMutex());

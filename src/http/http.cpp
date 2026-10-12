@@ -206,8 +206,9 @@ std::ostream& HttpResponse::dump(std::ostream&os)const
         if(strcasecmp(i.first.c_str(), "connection") == 0) {
             continue;
         }
-        os << i.first << ": " << i.second << "\r\n"; 
+        os << i.first << ": " << i.second << "\r\n";
     }
+    os << "connection: " << (m_close ? "close" : "keep-alive") << "\r\n";
     if(!m_body.empty()) {
         os << "content-length: " << m_body.size() << "\r\n\r\n"
            << m_body;

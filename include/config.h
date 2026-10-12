@@ -174,7 +174,7 @@ public:
         try
         {
             MutexType::ReadLock lock(m_mutex);
-            return ToStr()(m_val);
+            return ToStr()(m_val); // ToStr是个类 重载了()函数
         }
         catch(std::exception&e)
         {
@@ -220,6 +220,7 @@ public:
         MutexType::WriteLock lock(m_mutex);
         m_val = v;
     }
+    // on_change_cb的增删方法 
     uint64_t addListener(on_change_cb cb){
         static std::atomic<uint64_t> add_count{0};
         MutexType::WriteLock lock(m_mutex); 
@@ -254,10 +255,11 @@ public:
     static typename ConfigVar<T>::ptr LookUp(const std::string&name,const T& default_value,const std::string& description="" )
     {
         mo1al::RWmutex::WriteLock lock(GetMutex());
-        auto it = GetDatas().find(name);
+        auto it = GetDatas().find(name); 
         if(it!=GetDatas().end()){
             auto tmp = std::dynamic_pointer_cast<ConfigVar<T>>(it->second);
             if(tmp){
+                // 找到了并存在的情况 
                 SYLAR_LOG_INFO(SYLAR_LOG_ROOT())<<"Lookup name= "<<name<<" exists";
                 return tmp;
             }
@@ -269,9 +271,10 @@ public:
         }
         if(name.find_last_not_of("abcdefghijklmnopqrstuvwxyz._1234567890")!=std::string::npos)
         {
-            SYLAR_LOG_ERROR(SYLAR_LOG_ROOT())<<"Look Up name invalid"<<name;
+            SYLAR_LOG_ERROR(SYLAR_LOG_ROOT())<<"Look Up name invalid "<<name;
             throw std::invalid_argument(name);
         }
+        // 没找到也要注册 
         typename ConfigVar<T>::ptr v(new ConfigVar<T>(name,default_value,description));
         GetDatas()[name]= v; // shared_ptr 到基类指针的隐式转换
         return v;
@@ -289,10 +292,10 @@ public:
     }
 
     static ConfigVarBase::ptr LookUpBase(const std::string&name);
-
+    // 两个加载方法 
     static void LoadFromYaml(const YAML::Node&root);
     static void LoadFromConDir(const std::string&path,bool force = false);
-    
+    // 逐一访问map里面的每一个指针
     static void visit(std::function<void(ConfigVarBase::ptr)>cb);
 private:
     static ConfigVarMap& GetDatas(){

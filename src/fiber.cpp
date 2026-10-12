@@ -26,7 +26,7 @@ public:
     {
         return free(vp);
     }
-};
+};   
 using StackAllocator = MallocStackAllocator;
 uint64_t Fiber::GetFiberId()
 {
@@ -98,6 +98,7 @@ void Fiber::reset(std::function<void()>cb)
     m_cb = cb;
     makecontext(&m_ctx,&Fiber::MainFunc,0);
     m_state = INIT;
+    m_nextState = HOLD;
 }
 // 由主协程切换到当前协程（use_caller 模式）
 void Fiber::call()
@@ -115,21 +116,21 @@ void Fiber::back()
         SYLAR_ASSERT2(false,"swapcontext error");
     }
 }
-// 切换到当前协程
+// 主协程切换到当前子协程
 void Fiber::swapIn()
 {
     SetThis(this);
     SYLAR_ASSERT(m_state!=EXEC);
     m_state = EXEC;
-    if(swapcontext(&(Scheduler::GetMainFiber()->m_ctx),&m_ctx)){
+    if(swapcontext(&(Scheduler::GetCurrentFiber()->m_ctx),&m_ctx)){
         SYLAR_ASSERT2(false,"swapcontext error");
     }
 }
 // 切回主协程，当前协程让出执行权
 void Fiber::swapOut()
 {
-    SetThis(Scheduler::GetMainFiber());
-    if(swapcontext(&m_ctx,&Scheduler::GetMainFiber()->m_ctx)){
+    SetThis(Scheduler::GetCurrentFiber());
+    if(swapcontext(&m_ctx,&Scheduler::GetCurrentFiber()->m_ctx)){
         SYLAR_ASSERT2(false,"swapcontext error");
     }
 }
@@ -151,14 +152,14 @@ Fiber::ptr Fiber::GetThis()
 void Fiber::YieldToReady()
 {
     Fiber::ptr cur = GetThis();
-    cur->m_state = READY;
+    cur->m_nextState = READY; // 记录目标状态，由调度器在 swapIn 返回后落定
     cur->swapOut();
 }
 // 让出执行权并置为挂起态
 void Fiber::YieldToHold()
 {
     Fiber::ptr cur = GetThis();
-    cur->m_state = HOLD;
+    cur->m_nextState = HOLD;  // 记录目标状态，由调度器在 swapIn 返回后落定
     cur->swapOut();
 }
 uint64_t Fiber::TotalFibers()

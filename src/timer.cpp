@@ -106,8 +106,8 @@ Timer::ptr TimerManager::addTimer(uint64_t ms,std::function<void()>cb,bool recur
 {
     MutexType::WriteLock lock(m_mutex);
     Timer::ptr timer(new Timer(ms,cb,recurring,this));
-    addTimer(timer,lock);
     // addTimer 内部已解锁；lock 析构时因 is_lock 为 false 不会二次解锁
+    addTimer(timer,lock);
     return timer;
 }
 static void OnTimer(std::weak_ptr<void>weak_cond,std::function<void()>cb)
@@ -120,7 +120,6 @@ static void OnTimer(std::weak_ptr<void>weak_cond,std::function<void()>cb)
 Timer::ptr TimerManager::addConditionTimer(uint64_t ms,std::function<void()>cb,
     std::weak_ptr<void>weak_cond,bool recurring)
 {
-
     return TimerManager::addTimer(ms,std::bind(&OnTimer,weak_cond,cb),recurring);
 }
 bool TimerManager::detectClockRollOver(uint64_t now_ms)

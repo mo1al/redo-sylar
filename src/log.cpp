@@ -81,7 +81,7 @@ std::string LogFormatter::formatter(std::shared_ptr<Logger>logger,LogLevel::Leve
 }
 std::ostream& LogFormatter::formatter(std::ostream&ofs,std::shared_ptr<Logger>logger,LogLevel::Level level,LogEvent::ptr event)
 {
-    if(m_level<=level){ // 级别过滤：低于格式化器级别的日志不输出
+    if(m_level<=level){ 
         for(auto&i:m_items){
             i->format(ofs,logger,level,event);
         }
@@ -156,6 +156,7 @@ void LogFormatter::init(){
     if(!n_str.empty()){
         vec.push_back(std::make_tuple(n_str,"",0));
     }
+    // 工厂模式 
     static std::map<std::string,std::function<FormatItem::ptr(const std::string&str)>> m =
     {
     #define XX(str,C)\
@@ -172,6 +173,7 @@ void LogFormatter::init(){
     XX(T, TabFormatItem),               //T:Tab
     XX(F, FiberIdFormatItem),           //F:协程id
     XX(N, ThreadNameFormatItem),        //N:线程名称
+    // 拓展只需要写一个FormatItem子类+XX()
     #undef XX
     };
     for(auto&[str,fmt,type]:vec){
@@ -252,6 +254,7 @@ LogEventWrap::LogEventWrap(LogEvent::ptr e):m_event(e)
 }
 LogEventWrap::~LogEventWrap()
 {
+    // weak_ptr避免循环引用的问题
     auto logger = m_event->getLogger().lock(); // 从 weak_ptr 提升为 shared_ptr
     if(logger){
         logger->log(m_event->getLevel(),m_event);
@@ -262,7 +265,7 @@ LoggerManager::LoggerManager()
     m_root.reset(new Logger);
     m_root->addAppender(LogAppender::ptr(new StdCoutAppender));
     m_loggers[m_root->m_name] = m_root;
-
+    
 }
 Logger::ptr LoggerManager::getLogger(const std::string& name)
 {

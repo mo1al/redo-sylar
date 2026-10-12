@@ -32,6 +32,7 @@ static mo1al::ConfigVar<int>::ptr g_tcp_connect_timeout =
     XX(ioctl)\
     XX(getsockopt)\
     XX(setsockopt)
+
 // 通过 dlsym 解析 libc 原始函数地址
 void hook_init()
 {
@@ -94,7 +95,8 @@ static ssize_t do_io(int fd,OriginFun fun,const char*hook_fun_name,uint32_t even
         return fun(fd,std::forward<Args>(args)...);
     }
     uint64_t to = ctx->getTimeout(timeout_so);
-    std::shared_ptr<timer_info> tinfo(new timer_info);
+    // std::shared_ptr<timer_info> tinfo(new timer_info);
+    auto tinfo = std::make_shared<timer_info>();
 retry:
     ssize_t n = fun(fd,std::forward<Args>(args)...);
     while(n==-1&&errno==EINTR){ // 被信号中断则重试
@@ -108,6 +110,7 @@ retry:
             // 设置了超时时间，注册超时定时器
             timer = iom->addConditionTimer(to,[winfo,iom,fd,event](){
                 auto t = winfo.lock();
+                // 防御性检测 防止访问已释放的t
                 if(!t||t->cancelled){ // 已被取消说明 IO 已完成
                     return;
                 }
@@ -130,13 +133,15 @@ retry:
             mo1al::Fiber::YieldToHold();
             SYLAR_LOG_DEBUG(g_logger)<<"do io <"<<hook_fun_name<<">";
             /*
-            让出 CPU 等待 IO 事件或定时器超时：
+            - 让出 CPU 等待 IO 事件或定时器超时：
             - IO 就绪后由调度器重新调度，goto retry 重新执行 IO
             - 超时则标记 cancelled 并返回 -1
             */
+            // 取消定时器
             if(timer){
                 timer->cancel();
             }
+            // 超时的情况
             if(tinfo->cancelled){
                 errno = tinfo->cancelled;
                 return -1;
@@ -268,6 +273,7 @@ int connect_with_timeout(int fd,const struct sockaddr*addr,socklen_t addrlen,uin
     }
     int error = 0;
     socklen_t len = sizeof(int);
+    // 判断是否成功
     if(-1==getsockopt(fd,SOL_SOCKET,SO_ERROR,&error,&len)){
         return -1;
     }
@@ -317,7 +323,7 @@ ssize_t recvmsg(int sockfd,struct msghdr*msg,int flags)
 // write
 ssize_t write(int fd,const void*buf,size_t count)
 {
-    return do_io(fd,write_f,"write",mo1al::IOManager::WRITE,SO_RCVTIMEO,buf,count);
+    return do_io(fd,write_f,"write",mo1al::IOManager::WRITE,SO_SNDTIMEO,buf,count);
 }
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt) {
     return do_io(fd, writev_f, "writev", mo1al::IOManager::WRITE, SO_SNDTIMEO, iov, iovcnt);

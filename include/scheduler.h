@@ -17,18 +17,19 @@ public:
     virtual ~Scheduler();
     const std::string& getName()const {return m_name;}
     static Scheduler* GetThis();
-    static Fiber* GetMainFiber();
+    static Fiber* GetCurrentFiber();
     bool hasIdleThread()const{return m_idleThreadCount>0;}
     void start();
     void stop();
     // 调度单个协程或回调
+    // move优化
     template <class FiberOrCb>
     void schedule(FiberOrCb cb,int thread=-1)
     {
         bool need_tickle = false;
         {
             MutexType::Lock lock(m_mutex);
-            need_tickle = scheduleNoLock(cb,thread);
+            need_tickle = scheduleNoLock(std::move(cb),thread);
         }
         if(need_tickle)
         {
@@ -60,11 +61,12 @@ protected:
     void run();
     void SetThis();
 private:
+    // move优化
     template<class FiberOrCb>
     bool scheduleNoLock(FiberOrCb cb,int thread)
     {
         bool need_tickle =  m_fibers.empty();
-        FiberAndThread ft(cb,thread);
+        FiberAndThread ft(std::move(cb),thread);
         if(ft.cb||ft.fiber)
         {
             m_fibers.push_back(ft);
@@ -76,7 +78,7 @@ private:
     {
         Fiber::ptr fiber=nullptr;
         std::function<void()>cb=nullptr;
-        int thread = -1;
+        int thread = -1; // 指定线程id
 
         FiberAndThread()=default;
 
@@ -114,7 +116,7 @@ private:
     std::list<FiberAndThread>m_fibers;
     mo1al::Fiber::ptr m_rootFiber;
 protected:
-    std::vector<int>m_threadIds;
+    // std::vector<int>m_threadIds;
     std::atomic<size_t> m_threadCount ={0};
     std::atomic<size_t> m_activeThreadCount = {0};
     std::atomic<size_t> m_idleThreadCount={0};

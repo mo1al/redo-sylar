@@ -3,7 +3,7 @@
 #include"config.h"
 #include"log.h"
 #include"thread.h"
-#include"sinleton.h"
+#include"singleton.h"
 #include"util.h"
 #include"macro.h"
 #include"fiber.h"

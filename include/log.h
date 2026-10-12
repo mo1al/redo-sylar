@@ -13,14 +13,14 @@
 #include<map>
 #include<functional>
 #include <stdarg.h>
-#include"sinleton.h"
+#include"singleton.h"
 #include"util.h"
 #include<thread.h>
 // 流式日志宏：构造日志事件并返回其字符串流，供 << 运算符写入日志内容
 #define SYLAR_LOG_LEVEL(logger,level)\
     if(logger->getLevel()<=level)\
-        mo1al::LogEventWrap(mo1al::LogEvent::ptr(new mo1al::LogEvent(logger,level,__FILE__,\
-        __LINE__,0,mo1al::getThreadId(),mo1al::getFiberId(),time(0),mo1al::Thread::GetName()))).getSS()\
+        mo1al::LogEventWrap(std::make_shared<mo1al::LogEvent>(logger,level,__FILE__,\
+        __LINE__,0,mo1al::getThreadId(),mo1al::getFiberId(),time(0),mo1al::Thread::GetName())).getSS()\
 
 #define SYLAR_LOG_DEBUG(logger) SYLAR_LOG_LEVEL(logger,mo1al::LogLevel::DEBUG)
 #define SYLAR_LOG_INFO(logger) SYLAR_LOG_LEVEL(logger,mo1al::LogLevel::INFO)
@@ -65,6 +65,7 @@ public:
     // 构造：记录日志元信息，正文通过 getSS() 流式写入
     LogEvent(std::weak_ptr<Logger>logger,LogLevel::Level level,const char*file,int32_t line,uint32_t elapse,
         uint32_t threadid,uint32_t fiberid,uint64_t time,std::string threadname);
+
     // 以下为各字段的读取接口
     const char* getFile()const{return m_file;}
     int32_t getLine()const{return m_line;}

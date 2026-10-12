@@ -56,9 +56,9 @@ void test_sock()
 }
 int main()
 {
-    // test_sleep();
+    test_sleep();
     // test_hook();
-    mo1al::IOManager iom(1);
-    iom.schedule(test_sock);
+    // mo1al::IOManager iom(1);
+    // iom.schedule(test_sock);
     return 0;
 }

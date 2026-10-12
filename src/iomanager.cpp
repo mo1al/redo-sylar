@@ -30,12 +30,14 @@ void IOManager::FdContext::triggerEvent(IOManager::Event event)
     SYLAR_ASSERT(events&event);
     events = (Event)(events&~event); // 触发后清除该事件标志
     EventContext& ctx = getContext(event);
+    // 把事件放入到任务队列 
     if(ctx.cb){
         ctx.scheduler->schedule(&ctx.cb);
     }
     else if(ctx.fiber){
         ctx.scheduler->schedule(&ctx.fiber);
     }
+    // 所属调度器清空 
     ctx.scheduler = nullptr;
     return ;
 }
@@ -129,8 +131,7 @@ int IOManager::addEvent(int fd,Event event,std::function<void()>cb)
     }
     else{
         event_ctx.fiber = Fiber::GetThis();
-        SYLAR_ASSERT2(event_ctx.fiber->GetState()==Fiber::EXEC,"state = "
-        <<event_ctx.fiber->GetState());
+        SYLAR_ASSERT2(event_ctx.fiber->GetState()==Fiber::EXEC,"state = "<<event_ctx.fiber->GetState());
     }
     return 0;
 }
